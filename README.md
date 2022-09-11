@@ -1,70 +1,121 @@
-# Getting Started with Create React App
+# Get GitHub Repos - GraphQL
 
-This project was bootstrapped with [Create React App](https://github.com/facebook/create-react-app).
+### Here’s how you can create a GraphQL API to get your GitHub repositories in a React js project.
 
-## Available Scripts
+1. Create a react app using `npx create-react-app app-name`.
+2. Add required dependencies. Here’s the command for both ~npm~ and ~yarn~
 
-In the project directory, you can run:
+`npm i octokit graphql express-graphql express dotenv cors @apollo/client`
 
-### `npm start`
+`yarn add octokit graphql express-graphql express dotenv cors @apollo/client`
 
-Runs the app in the development mode.\
-Open [http://localhost:3000](http://localhost:3000) to view it in your browser.
+3. Create a folder in which you will keep your backend related code, you can name it anything you want but the best practices include: server, backend.
+4. Create a ~server.js~ file inside server folder and initialise an express app in it. Here’s the code for that:
 
-The page will reload when you make changes.\
-You may also see any lint errors in the console.
+```
+const express = require("express");
+const { graphqlHTTP } = require("express-graphql");
+const cors = require("cors");
+const schema = require("./schemas/schema");
 
-### `npm test`
+// The root provides a resolver function for each API endpoint
+const app = express();
 
-Launches the test runner in the interactive watch mode.\
-See the section about [running tests](https://facebook.github.io/create-react-app/docs/running-tests) for more information.
+app.use(cors());
 
-### `npm run build`
+app.use(
+  "/graphql",
+  graphqlHTTP({
+    schema: schema,
+    graphiql: true,
+  })
+);
+app.listen(4000);
+console.log("Running a GraphQL API server at http://localhost:4000/graphql");
 
-Builds the app for production to the `build` folder.\
-It correctly bundles React in production mode and optimizes the build for the best performance.
+```
 
-The build is minified and the filenames include the hashes.\
-Your app is ready to be deployed!
+This block of code basically initialises the GraphQL server using express and also blocks CORS error . 5. Let’s create a folder inside server folder and name it schema, the folder structure would be server/schema. 6. Create a ~schema.js~ file inside the schema folder and add the following code to it:
 
-See the section about [deployment](https://facebook.github.io/create-react-app/docs/deployment) for more information.
+```
+require("dotenv").config();
+const graphql = require("graphql");
+const { GraphQLObjectType } = graphql;
+const { Octokit } = require("octokit");
+const octokit = new Octokit({
+  auth: process.env.OCTOKIT_AUTH_KEY,
+});
 
-### `npm run eject`
+const RepoType = new GraphQLObjectType({
+  name: "GetRepoData",
+  fields: () => ({
+    id: { type: graphql.GraphQLID },
+    name: { type: graphql.GraphQLString },
+    fullName: { type: graphql.GraphQLString },
+    createdAt: { type: graphql.GraphQLString },
+    language: { type: graphql.GraphQLString },
+    visibility: { type: graphql.GraphQLString },
+    description: { type: graphql.GraphQLString },
+    url: { type: graphql.GraphQLString },
+  }),
+});
 
-**Note: this is a one-way operation. Once you `eject`, you can't go back!**
+const RootQuery = new GraphQLObjectType({
+  name: "RootQueryType",
+  fields: () => ({
+    GetRepoById: {
+      type: RepoType,
+      args: { id: { type: graphql.GraphQLID } },
+      async resolve(parent, args) {
+        console.log(args);
+        const data = await octokit.request("GET /user/repos", { per_page: 1 });
 
-If you aren't satisfied with the build tool and configuration choices, you can `eject` at any time. This command will remove the single build dependency from your project.
+        const newData = data.data.map((l) => {
+          return {
+            id: l.id,
+            name: l.name,
+            fullName: l.full_name,
+            createdAt: l.created_at,
+            language: l.language,
+            visibility: l.visibility,
+            description: l.description,
+            url: l.url,
+          };
+        });
+        return newData.find((x) => x.id === +args.id);
+      },
+    },
+    GetAllRepos: {
+      type: graphql.GraphQLList(RepoType),
+      async resolve(parent, args) {
+        const data = await octokit.request("GET /user/repos", {});
+        const newData = data.data.map((l) => {
+          // you can add or remove the items that you want.
+          return {
+            id: l.id,
+            name: l.name,
+            fullName: l.full_name,
+            createdAt: l.created_at,
+            language: l.language,
+            visibility: l.visibility,
+            description: l.description,
+            url: l.url,
+          };
+        });
+        return newData;
+      },
+    },
+  }),
+});
 
-Instead, it will copy all the configuration files and the transitive dependencies (webpack, Babel, ESLint, etc) right into your project so you have full control over them. All of the commands except `eject` will still work, but they will point to the copied scripts so you can tweak them. At this point you're on your own.
+module.exports = new graphql.GraphQLSchema({
+  query: RootQuery,
+});
+```
 
-You don't have to ever use `eject`. The curated feature set is suitable for small and middle deployments, and you shouldn't feel obligated to use this feature. However we understand that this tool wouldn't be useful if you couldn't customize it when you are ready for it.
-
-## Learn More
-
-You can learn more in the [Create React App documentation](https://facebook.github.io/create-react-app/docs/getting-started).
-
-To learn React, check out the [React documentation](https://reactjs.org/).
-
-### Code Splitting
-
-This section has moved here: [https://facebook.github.io/create-react-app/docs/code-splitting](https://facebook.github.io/create-react-app/docs/code-splitting)
-
-### Analyzing the Bundle Size
-
-This section has moved here: [https://facebook.github.io/create-react-app/docs/analyzing-the-bundle-size](https://facebook.github.io/create-react-app/docs/analyzing-the-bundle-size)
-
-### Making a Progressive Web App
-
-This section has moved here: [https://facebook.github.io/create-react-app/docs/making-a-progressive-web-app](https://facebook.github.io/create-react-app/docs/making-a-progressive-web-app)
-
-### Advanced Configuration
-
-This section has moved here: [https://facebook.github.io/create-react-app/docs/advanced-configuration](https://facebook.github.io/create-react-app/docs/advanced-configuration)
-
-### Deployment
-
-This section has moved here: [https://facebook.github.io/create-react-app/docs/deployment](https://facebook.github.io/create-react-app/docs/deployment)
-
-### `npm run build` fails to minify
-
-This section has moved here: [https://facebook.github.io/create-react-app/docs/troubleshooting#npm-run-build-fails-to-minify](https://facebook.github.io/create-react-app/docs/troubleshooting#npm-run-build-fails-to-minify)
+What we are doing here is that we are connecting to the OctoKit API which is GitHub’s API that allows us to get data related to repositories in this case, but is not limited to only getting repository data.
+You would need to create your authentication key in your GitHub account.
+Just go to:
+::Settings > Developer Settings > Personal access tokens > Generate new token::
+Make sure you check the **Repo** in ~Select scopes~ section.
+After you have successfully generated the token add that as the OctoKit auth value shown in the code block. 7. Run server.js file `nodemon server.js`. You will be able to interact with the API locally on http://localhost:4000/graphql
